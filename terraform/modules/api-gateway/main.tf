@@ -20,7 +20,7 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
 
 locals {
   integrations = {
-    analyze  = { arn = var.analyze_fn_arn,  route = "POST /analyze" }
+    analyze  = { arn = var.analyze_fn_arn, route = "POST /analyze" }
     estimate = { arn = var.estimate_fn_arn, route = "POST /estimate" }
     generate = { arn = var.generate_fn_arn, route = "POST /generate" }
   }

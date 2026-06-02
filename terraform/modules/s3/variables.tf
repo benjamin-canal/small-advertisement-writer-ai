@@ -1,3 +1,3 @@
-variable "env"     { type = string }
+variable "env" { type = string }
 variable "project" { type = string }
-variable "tags"    { type = map(string) }
+variable "tags" { type = map(string) }
