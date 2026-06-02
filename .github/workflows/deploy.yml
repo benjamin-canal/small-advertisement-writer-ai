@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION:    eu-west-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Lambdas
+        run: npm run build
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ">=1.7"
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Select prod workspace
+        working-directory: terraform
+        run: terraform workspace select prod || terraform workspace new prod
+
+      - name: Terraform apply
+        working-directory: terraform
+        run: terraform apply -var-file=environments/prod.tfvars -auto-approve -input=false
+
+      - name: Update Lambda code
+        run: |
+          for fn in analyze-fn estimate-fn generate-fn; do
+            zip -j dist/${fn}/handler.zip dist/${fn}/handler.mjs
+            aws lambda update-function-code \
+              --function-name saw-${fn}-prod \
+              --zip-file fileb://dist/${fn}/handler.zip
+          done
+
+      - name: Record deployment version
+        run: |
+          aws dynamodb put-item \
+            --table-name saw-versions-prod \
+            --item "{
+              \"version\":    {\"S\": \"$GITHUB_SHA\"},
+              \"deployedAt\": {\"S\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},
+              \"commitSha\":  {\"S\": \"$GITHUB_SHA\"},
+              \"env\":        {\"S\": \"prod\"}
+            }"
