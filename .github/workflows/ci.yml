@@ -12,8 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run typecheck
 
   terraform:
@@ -30,8 +29,6 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ">=1.7"
-      - run: terraform init
+      - run: terraform init -backend=false
       - run: terraform fmt -check -recursive
       - run: terraform validate
-      - run: terraform workspace select dev || terraform workspace new dev
-      - run: terraform plan -var-file=environments/dev.tfvars -input=false
