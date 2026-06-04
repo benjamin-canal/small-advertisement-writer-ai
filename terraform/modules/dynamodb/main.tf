@@ -13,6 +13,22 @@ resource "aws_dynamodb_table" "requests" {
   point_in_time_recovery {
     enabled = true
   }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "timestamp-index"
+    hash_key        = "timestamp"
+    projection_type = "ALL"
+  }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
 }
 
 resource "aws_dynamodb_table" "versions" {

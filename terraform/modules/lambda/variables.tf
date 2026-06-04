@@ -18,3 +18,8 @@ variable "layers" {
   type    = list(string)
   default = []
 }
+variable "reserved_concurrency" {
+  description = "Reserved concurrent executions (-1 = unreserved)"
+  type        = number
+  default     = -1
+}
