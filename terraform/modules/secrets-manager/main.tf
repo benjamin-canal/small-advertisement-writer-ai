@@ -24,3 +24,23 @@ resource "aws_iam_policy" "read" {
     }]
   })
 }
+
+# Anthropic API key — value must be set manually after first apply:
+#   aws secretsmanager put-secret-value --secret-id <arn> --secret-string "sk-ant-..."
+resource "aws_secretsmanager_secret" "anthropic" {
+  name                    = "${var.project}-anthropic-key-${var.env}"
+  recovery_window_in_days = 0
+  tags                    = var.tags
+}
+
+resource "aws_iam_policy" "anthropic_read" {
+  name = "${var.project}-anthropic-read-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = aws_secretsmanager_secret.anthropic.arn
+    }]
+  })
+}

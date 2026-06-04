@@ -22,7 +22,7 @@ export const handler = async (
       return err('Missing required fields', 400);
     }
 
-    const message = await getClient().messages.create({
+    const message = await (await getClient()).messages.create({
       model: MODEL,
       max_tokens: 512,
       system: [cachedSystem(SYSTEM_PROMPT)],

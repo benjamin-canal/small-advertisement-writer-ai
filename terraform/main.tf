@@ -79,13 +79,15 @@ module "analyze_fn" {
   source_dir    = "${path.root}/../dist/analyze-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    S3_BUCKET      = module.s3.bucket_name
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL             = var.log_level
+    S3_BUCKET             = module.s3.bucket_name
+    DYNAMODB_TABLE        = module.dynamodb.requests_table_name
+    ANTHROPIC_SECRET_ARN  = module.secrets_manager.anthropic_secret_arn
   }
   extra_policy_arns = [
     module.s3.read_policy_arn,
     module.dynamodb.write_policy_arn,
+    module.secrets_manager.anthropic_read_policy_arn,
   ]
 }
 
@@ -99,10 +101,14 @@ module "estimate_fn" {
   source_dir    = "${path.root}/../dist/estimate-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL            = var.log_level
+    DYNAMODB_TABLE       = module.dynamodb.requests_table_name
+    ANTHROPIC_SECRET_ARN = module.secrets_manager.anthropic_secret_arn
   }
-  extra_policy_arns = [module.dynamodb.write_policy_arn]
+  extra_policy_arns = [
+    module.dynamodb.write_policy_arn,
+    module.secrets_manager.anthropic_read_policy_arn,
+  ]
 }
 
 module "generate_fn" {
@@ -115,10 +121,14 @@ module "generate_fn" {
   source_dir    = "${path.root}/../dist/generate-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL            = var.log_level
+    DYNAMODB_TABLE       = module.dynamodb.requests_table_name
+    ANTHROPIC_SECRET_ARN = module.secrets_manager.anthropic_secret_arn
   }
-  extra_policy_arns = [module.dynamodb.write_policy_arn]
+  extra_policy_arns = [
+    module.dynamodb.write_policy_arn,
+    module.secrets_manager.anthropic_read_policy_arn,
+  ]
 }
 
 module "api_gateway" {

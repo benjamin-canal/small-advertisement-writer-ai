@@ -30,7 +30,7 @@ export const handler = async (
     const bytes = await s3Res.Body!.transformToByteArray();
     const base64 = Buffer.from(bytes).toString('base64');
 
-    const message = await getClient().messages.create({
+    const message = await (await getClient()).messages.create({
       model: MODEL,
       max_tokens: 256,
       system: [cachedSystem(SYSTEM_PROMPT)],
