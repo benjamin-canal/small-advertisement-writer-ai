@@ -99,12 +99,13 @@ resource "aws_iam_policy" "bedrock" {
 }
 
 module "analyze_fn" {
-  source        = "./modules/lambda"
-  function_name = "${local.project}-analyze-fn-${local.env}"
-  handler       = "handler.handler"
-  runtime       = "nodejs22.x"
-  memory_mb     = var.analyze_memory_mb
-  log_retention = var.log_retention_days
+  source          = "./modules/lambda"
+  function_name   = "${local.project}-analyze-fn-${local.env}"
+  handler         = "handler.handler"
+  runtime         = "nodejs22.x"
+  memory_mb       = var.analyze_memory_mb
+  timeout_seconds = 60
+  log_retention   = var.log_retention_days
   source_dir    = "${path.root}/../dist/analyze-fn"
   tags          = local.tags
   env_vars = {
