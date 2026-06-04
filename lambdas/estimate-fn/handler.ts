@@ -31,7 +31,12 @@ export const handler = async (
     }));
 
     const text = extractText(response.output?.message?.content);
-    const data = JSON.parse(text) as EstimatePriceResponse;
+    let data: EstimatePriceResponse;
+    try {
+      data = JSON.parse(text) as EstimatePriceResponse;
+    } catch {
+      throw new Error('Invalid response from AI model');
+    }
 
     await audit(requestId, '/estimate', Date.now() - start, 200);
     return ok(data);

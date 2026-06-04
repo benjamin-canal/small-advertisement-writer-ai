@@ -13,7 +13,8 @@ export function err(
   message: string,
   statusCode = 500
 ): { statusCode: number; body: string; headers: Record<string, string> } {
-  const response: ApiResponse<never> = { success: false, error: message };
+  const clientMessage = statusCode >= 500 ? 'Internal server error' : message;
+  const response: ApiResponse<never> = { success: false, error: clientMessage };
   return {
     statusCode,
     headers: { 'Content-Type': 'application/json' },
