@@ -40,7 +40,7 @@ resource "aws_lambda_function" "fn" {
   handler          = var.handler
   runtime          = var.runtime
   memory_size      = var.memory_mb
-  timeout          = 30
+  timeout          = var.timeout_seconds
   filename         = data.archive_file.zip.output_path
   source_code_hash = data.archive_file.zip.output_base64sha256
 
