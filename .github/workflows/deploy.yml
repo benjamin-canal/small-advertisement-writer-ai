@@ -47,7 +47,7 @@ jobs:
 
       - name: Terraform init
         working-directory: terraform
-        run: terraform init -backend-config="bucket=${{ secrets.TF_BACKEND_BUCKET }}"
+        run: terraform init -backend-config="bucket=${{ secrets.TF_BACKEND_BUCKET }}" -backend-config="key=small-advertisement-writer-ai/prod/terraform.tfstate"
 
       - name: Terraform apply
         working-directory: terraform
