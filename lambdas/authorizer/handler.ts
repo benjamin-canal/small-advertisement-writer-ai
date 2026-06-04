@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
@@ -40,6 +41,6 @@ export const handler = async (
 
   const isAuthorized =
     key.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected));
+    timingSafeEqual(Buffer.from(key), Buffer.from(expected));
   return { isAuthorized, context: {} };
 };
