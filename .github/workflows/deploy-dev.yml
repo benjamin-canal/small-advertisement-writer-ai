@@ -45,12 +45,3 @@ jobs:
       - name: Terraform apply
         working-directory: terraform
         run: terraform apply -var-file=environments/dev.tfvars -auto-approve -input=false
-
-      - name: Update Lambda code
-        run: |
-          for fn in analyze-fn estimate-fn generate-fn; do
-            zip -j dist/${fn}/handler.zip dist/${fn}/handler.mjs
-            aws lambda update-function-code \
-              --function-name saw-${fn}-dev \
-              --zip-file fileb://dist/${fn}/handler.zip
-          done
