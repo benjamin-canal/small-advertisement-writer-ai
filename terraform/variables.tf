@@ -37,6 +37,12 @@ variable "log_level" {
   default     = "ERROR"
 }
 
+variable "lambda_reserved_concurrency" {
+  description = "Max concurrent Lambda executions per AI function (limits Bedrock cost runaway)"
+  type        = number
+  default     = 10
+}
+
 # Cross-region inference profile for eu-west-1.
 # See: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
 variable "bedrock_model_id" {

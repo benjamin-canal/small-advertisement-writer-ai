@@ -83,9 +83,10 @@ async function audit(
   error?: string
 ) {
   try {
+    const expiresAt = Math.floor(Date.now() / 1000) + 90 * 24 * 3600;
     await ddb.send(new PutCommand({
       TableName: TABLE,
-      Item: { requestId, timestamp: new Date().toISOString(), endpoint, durationMs, statusCode, ...(error && { error }) },
+      Item: { requestId, timestamp: new Date().toISOString(), endpoint, durationMs, statusCode, expiresAt, ...(error && { error }) },
     }));
   } catch {}
 }
