@@ -1,7 +1,8 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { getClient, MODEL, cachedSystem } from '../shared/anthropic.js';
+import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
 import { ok, err } from '../shared/response.js';
 import type { GenerateRequest, GeneratedListing } from '../shared/types.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
@@ -22,25 +23,17 @@ export const handler = async (
       return err('Missing required fields', 400);
     }
 
-    const message = await (await getClient()).messages.create({
-      model: MODEL,
-      max_tokens: 512,
-      system: [cachedSystem(SYSTEM_PROMPT)],
-      messages: [
-        {
-          role: 'user',
-          content: buildUserPrompt(
-            body.object,
-            body.condition,
-            body.category,
-            body.platform,
-            body.priceRange
-          ),
-        },
-      ],
-    });
+    const response = await getClient().send(new ConverseCommand({
+      modelId: MODEL_ID,
+      system: cachedSystem(SYSTEM_PROMPT),
+      messages: [{
+        role: 'user',
+        content: [{ text: buildUserPrompt(body.object, body.condition, body.category, body.platform, body.priceRange) }],
+      }],
+      inferenceConfig: inferenceConfig(512),
+    }));
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    const text = extractText(response.output?.message?.content);
     const data = JSON.parse(text) as GeneratedListing;
 
     await audit(requestId, '/generate', Date.now() - start, 200);
@@ -60,18 +53,9 @@ async function audit(
   error?: string
 ) {
   try {
-    await ddb.send(
-      new PutCommand({
-        TableName: TABLE,
-        Item: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          endpoint,
-          durationMs,
-          statusCode,
-          ...(error && { error }),
-        },
-      })
-    );
+    await ddb.send(new PutCommand({
+      TableName: TABLE,
+      Item: { requestId, timestamp: new Date().toISOString(), endpoint, durationMs, statusCode, ...(error && { error }) },
+    }));
   } catch {}
 }

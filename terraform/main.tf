@@ -69,16 +69,18 @@ module "authorizer" {
   extra_policy_arns = [module.secrets_manager.read_policy_arn]
 }
 
-locals {
-  # Env vars shared by all AI Lambdas for the Parameters & Secrets extension
-  secrets_extension_env = {
-    ANTHROPIC_SECRET_ARN                         = module.secrets_manager.anthropic_secret_arn
-    PARAMETERS_SECRETS_EXTENSION_CACHE_ENABLED   = "true"
-    PARAMETERS_SECRETS_EXTENSION_CACHE_SIZE      = "10"
-    PARAMETERS_SECRETS_EXTENSION_MAX_CONNECTIONS = "3"
-    PARAMETERS_SECRETS_EXTENSION_HTTP_PORT       = "2773"
-    PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL       = var.env == "dev" ? "debug" : "warn"
-  }
+# IAM policy granting Bedrock InvokeModel access to Claude models
+resource "aws_iam_policy" "bedrock" {
+  name = "${local.project}-bedrock-${local.env}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["bedrock:InvokeModel"]
+      Resource = "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+    }]
+  })
+  tags = local.tags
 }
 
 module "analyze_fn" {
@@ -90,16 +92,16 @@ module "analyze_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/analyze-fn"
   tags          = local.tags
-  layers        = [var.secrets_extension_layer_arn]
-  env_vars = merge(local.secrets_extension_env, {
-    LOG_LEVEL      = var.log_level
-    S3_BUCKET      = module.s3.bucket_name
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
-  })
+  env_vars = {
+    LOG_LEVEL        = var.log_level
+    S3_BUCKET        = module.s3.bucket_name
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
+  }
   extra_policy_arns = [
     module.s3.read_policy_arn,
     module.dynamodb.write_policy_arn,
-    module.secrets_manager.anthropic_read_policy_arn,
+    aws_iam_policy.bedrock.arn,
   ]
 }
 
@@ -112,14 +114,14 @@ module "estimate_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/estimate-fn"
   tags          = local.tags
-  layers        = [var.secrets_extension_layer_arn]
-  env_vars = merge(local.secrets_extension_env, {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
-  })
+  env_vars = {
+    LOG_LEVEL        = var.log_level
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
+  }
   extra_policy_arns = [
     module.dynamodb.write_policy_arn,
-    module.secrets_manager.anthropic_read_policy_arn,
+    aws_iam_policy.bedrock.arn,
   ]
 }
 
@@ -132,14 +134,14 @@ module "generate_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/generate-fn"
   tags          = local.tags
-  layers        = [var.secrets_extension_layer_arn]
-  env_vars = merge(local.secrets_extension_env, {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
-  })
+  env_vars = {
+    LOG_LEVEL        = var.log_level
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
+  }
   extra_policy_arns = [
     module.dynamodb.write_policy_arn,
-    module.secrets_manager.anthropic_read_policy_arn,
+    aws_iam_policy.bedrock.arn,
   ]
 }
 

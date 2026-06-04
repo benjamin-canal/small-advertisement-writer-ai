@@ -1,8 +1,9 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { getClient, MODEL, cachedSystem } from '../shared/anthropic.js';
+import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
 import { ok, err } from '../shared/response.js';
 import type { AnalyzeRequest, AnalyzeResponse } from '../shared/types.js';
 import { SYSTEM_PROMPT, USER_PROMPT } from './prompts.js';
@@ -27,25 +28,22 @@ export const handler = async (
     }
 
     const s3Res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: body.s3Key }));
-    const bytes = await s3Res.Body!.transformToByteArray();
-    const base64 = Buffer.from(bytes).toString('base64');
+    const imageBytes = await s3Res.Body!.transformToByteArray();
 
-    const message = await (await getClient()).messages.create({
-      model: MODEL,
-      max_tokens: 256,
-      system: [cachedSystem(SYSTEM_PROMPT)],
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-            { type: 'text', text: USER_PROMPT },
-          ],
-        },
-      ],
-    });
+    const response = await getClient().send(new ConverseCommand({
+      modelId: MODEL_ID,
+      system: cachedSystem(SYSTEM_PROMPT),
+      messages: [{
+        role: 'user',
+        content: [
+          { image: { format: 'jpeg', source: { bytes: imageBytes } } },
+          { text: USER_PROMPT },
+        ],
+      }],
+      inferenceConfig: inferenceConfig(256),
+    }));
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    const text = extractText(response.output?.message?.content);
     const data = JSON.parse(text) as AnalyzeResponse;
 
     await audit(requestId, '/analyze', Date.now() - start, 200);
@@ -65,18 +63,9 @@ async function audit(
   error?: string
 ) {
   try {
-    await ddb.send(
-      new PutCommand({
-        TableName: TABLE,
-        Item: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          endpoint,
-          durationMs,
-          statusCode,
-          ...(error && { error }),
-        },
-      })
-    );
+    await ddb.send(new PutCommand({
+      TableName: TABLE,
+      Item: { requestId, timestamp: new Date().toISOString(), endpoint, durationMs, statusCode, ...(error && { error }) },
+    }));
   } catch {}
 }

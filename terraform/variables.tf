@@ -37,11 +37,10 @@ variable "log_level" {
   default     = "ERROR"
 }
 
-# ARN of the AWS Parameters and Secrets Lambda Extension layer for the target region.
-# See: https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets_lambda.html
-variable "secrets_extension_layer_arn" {
-  description = "ARN of the AWS Parameters and Secrets Lambda Extension layer"
+# Cross-region inference profile for eu-west-1.
+# See: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
+variable "bedrock_model_id" {
+  description = "Amazon Bedrock model ID (cross-region inference profile)"
   type        = string
-  # eu-west-1 — update for other regions
-  default = "arn:aws:lambda:eu-west-1:015030872274:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
+  default     = "eu.anthropic.claude-opus-4-5-20251101-v1:0"
 }
