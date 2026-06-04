@@ -4,8 +4,9 @@ resource "random_password" "api_key" {
 }
 
 resource "aws_secretsmanager_secret" "api_key" {
-  name = "${var.project}-api-key-${var.env}"
-  tags = var.tags
+  name                    = "${var.project}-api-key-${var.env}"
+  recovery_window_in_days = 0
+  tags                    = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "api_key" {
