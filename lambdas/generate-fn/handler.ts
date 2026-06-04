@@ -34,7 +34,12 @@ export const handler = async (
     }));
 
     const text = extractText(response.output?.message?.content);
-    const data = JSON.parse(text) as GeneratedListing;
+    let data: GeneratedListing;
+    try {
+      data = JSON.parse(text) as GeneratedListing;
+    } catch {
+      throw new Error('Invalid response from AI model');
+    }
 
     await audit(requestId, '/generate', Date.now() - start, 200);
     return ok(data);
