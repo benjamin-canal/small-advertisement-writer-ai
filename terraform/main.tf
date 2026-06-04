@@ -99,15 +99,16 @@ resource "aws_iam_policy" "bedrock" {
 }
 
 module "analyze_fn" {
-  source          = "./modules/lambda"
-  function_name   = "${local.project}-analyze-fn-${local.env}"
-  handler         = "handler.handler"
-  runtime         = "nodejs22.x"
-  memory_mb       = var.analyze_memory_mb
-  timeout_seconds = 60
-  log_retention   = var.log_retention_days
-  source_dir    = "${path.root}/../dist/analyze-fn"
-  tags          = local.tags
+  source               = "./modules/lambda"
+  function_name        = "${local.project}-analyze-fn-${local.env}"
+  handler              = "handler.handler"
+  runtime              = "nodejs22.x"
+  memory_mb            = var.analyze_memory_mb
+  timeout_seconds      = 60
+  log_retention        = var.log_retention_days
+  source_dir           = "${path.root}/../dist/analyze-fn"
+  tags                 = local.tags
+  reserved_concurrency = var.lambda_reserved_concurrency
   env_vars = {
     LOG_LEVEL        = var.log_level
     S3_BUCKET        = module.s3.bucket_name
@@ -122,14 +123,15 @@ module "analyze_fn" {
 }
 
 module "estimate_fn" {
-  source        = "./modules/lambda"
-  function_name = "${local.project}-estimate-fn-${local.env}"
-  handler       = "handler.handler"
-  runtime       = "nodejs22.x"
-  memory_mb     = var.default_memory_mb
-  log_retention = var.log_retention_days
-  source_dir    = "${path.root}/../dist/estimate-fn"
-  tags          = local.tags
+  source               = "./modules/lambda"
+  function_name        = "${local.project}-estimate-fn-${local.env}"
+  handler              = "handler.handler"
+  runtime              = "nodejs22.x"
+  memory_mb            = var.default_memory_mb
+  log_retention        = var.log_retention_days
+  source_dir           = "${path.root}/../dist/estimate-fn"
+  tags                 = local.tags
+  reserved_concurrency = var.lambda_reserved_concurrency
   env_vars = {
     LOG_LEVEL        = var.log_level
     DYNAMODB_TABLE   = module.dynamodb.requests_table_name
@@ -142,14 +144,15 @@ module "estimate_fn" {
 }
 
 module "generate_fn" {
-  source        = "./modules/lambda"
-  function_name = "${local.project}-generate-fn-${local.env}"
-  handler       = "handler.handler"
-  runtime       = "nodejs22.x"
-  memory_mb     = var.default_memory_mb
-  log_retention = var.log_retention_days
-  source_dir    = "${path.root}/../dist/generate-fn"
-  tags          = local.tags
+  source               = "./modules/lambda"
+  function_name        = "${local.project}-generate-fn-${local.env}"
+  handler              = "handler.handler"
+  runtime              = "nodejs22.x"
+  memory_mb            = var.default_memory_mb
+  log_retention        = var.log_retention_days
+  source_dir           = "${path.root}/../dist/generate-fn"
+  tags                 = local.tags
+  reserved_concurrency = var.lambda_reserved_concurrency
   env_vars = {
     LOG_LEVEL        = var.log_level
     DYNAMODB_TABLE   = module.dynamodb.requests_table_name
