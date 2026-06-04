@@ -12,14 +12,24 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "saw-terraform-state"
-    key    = "small-advertisement-writer-ai/terraform.tfstate"
-    region = "eu-west-1"
+    bucket         = "saw-terraform-state"
+    key            = "small-advertisement-writer-ai/terraform.tfstate"
+    region         = "eu-west-1"
+    dynamodb_table = "saw-terraform-locks"
+    encrypt        = true
   }
 }
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = "small-advertisement-writer-ai"
+      Environment = var.env
+      ManagedBy   = "terraform"
+    }
+  }
 }
 
 locals {
@@ -75,9 +85,14 @@ resource "aws_iam_policy" "bedrock" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["bedrock:InvokeModel"]
-      Resource = "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+      Effect = "Allow"
+      Action = ["bedrock:InvokeModel"]
+      Resource = [
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-*",
+        "arn:aws:bedrock:${var.aws_region}:*:inference-profile/eu.anthropic.claude-haiku-4-5-*",
+        "arn:aws:bedrock:${var.aws_region}:*:inference-profile/eu.anthropic.claude-sonnet-4-*",
+      ]
     }]
   })
   tags = local.tags
