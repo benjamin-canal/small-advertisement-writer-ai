@@ -69,6 +69,20 @@ module "authorizer" {
   extra_policy_arns = [module.secrets_manager.read_policy_arn]
 }
 
+# IAM policy granting Bedrock InvokeModel access to Claude models
+resource "aws_iam_policy" "bedrock" {
+  name = "${local.project}-bedrock-${local.env}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["bedrock:InvokeModel"]
+      Resource = "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+    }]
+  })
+  tags = local.tags
+}
+
 module "analyze_fn" {
   source        = "./modules/lambda"
   function_name = "${local.project}-analyze-fn-${local.env}"
@@ -79,13 +93,15 @@ module "analyze_fn" {
   source_dir    = "${path.root}/../dist/analyze-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    S3_BUCKET      = module.s3.bucket_name
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL        = var.log_level
+    S3_BUCKET        = module.s3.bucket_name
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
   }
   extra_policy_arns = [
     module.s3.read_policy_arn,
     module.dynamodb.write_policy_arn,
+    aws_iam_policy.bedrock.arn,
   ]
 }
 
@@ -99,10 +115,14 @@ module "estimate_fn" {
   source_dir    = "${path.root}/../dist/estimate-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL        = var.log_level
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
   }
-  extra_policy_arns = [module.dynamodb.write_policy_arn]
+  extra_policy_arns = [
+    module.dynamodb.write_policy_arn,
+    aws_iam_policy.bedrock.arn,
+  ]
 }
 
 module "generate_fn" {
@@ -115,10 +135,14 @@ module "generate_fn" {
   source_dir    = "${path.root}/../dist/generate-fn"
   tags          = local.tags
   env_vars = {
-    LOG_LEVEL      = var.log_level
-    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+    LOG_LEVEL        = var.log_level
+    DYNAMODB_TABLE   = module.dynamodb.requests_table_name
+    BEDROCK_MODEL_ID = var.bedrock_model_id
   }
-  extra_policy_arns = [module.dynamodb.write_policy_arn]
+  extra_policy_arns = [
+    module.dynamodb.write_policy_arn,
+    aws_iam_policy.bedrock.arn,
+  ]
 }
 
 module "api_gateway" {

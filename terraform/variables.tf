@@ -36,3 +36,11 @@ variable "log_level" {
   type        = string
   default     = "ERROR"
 }
+
+# Cross-region inference profile for eu-west-1.
+# See: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
+variable "bedrock_model_id" {
+  description = "Amazon Bedrock model ID (cross-region inference profile)"
+  type        = string
+  default     = "eu.anthropic.claude-opus-4-5-20251101-v1:0"
+}
