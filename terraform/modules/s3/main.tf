@@ -10,6 +10,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "images" {
     id     = "expire-24h"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = 1
     }

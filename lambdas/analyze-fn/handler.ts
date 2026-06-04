@@ -27,8 +27,19 @@ export const handler = async (
       return err('Missing s3Key or requestId', 400);
     }
 
+    if (/\.\./.test(body.s3Key) || body.s3Key.startsWith('/')) {
+      return err('Invalid s3Key', 400);
+    }
+
     const s3Res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: body.s3Key }));
-    const imageBytes = await s3Res.Body!.transformToByteArray();
+    if (!s3Res.Body) {
+      return err('Object not found', 404);
+    }
+    const imageBytes = await s3Res.Body.transformToByteArray();
+
+    if (imageBytes.byteLength > 5 * 1024 * 1024) {
+      return err('Image too large (max 5 MB)', 400);
+    }
 
     const response = await getClient().send(new ConverseCommand({
       modelId: MODEL_ID,
@@ -44,7 +55,12 @@ export const handler = async (
     }));
 
     const text = extractText(response.output?.message?.content);
-    const data = JSON.parse(text) as AnalyzeResponse;
+    let data: AnalyzeResponse;
+    try {
+      data = JSON.parse(text) as AnalyzeResponse;
+    } catch {
+      throw new Error('Invalid response from AI model');
+    }
 
     await audit(requestId, '/analyze', Date.now() - start, 200);
     return ok(data);
