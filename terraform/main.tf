@@ -11,8 +11,8 @@ terraform {
     }
   }
 
+  # bucket passé via -backend-config en CI (secret TF_BACKEND_BUCKET)
   backend "s3" {
-    bucket         = "saw-terraform-state"
     key            = "small-advertisement-writer-ai/terraform.tfstate"
     region         = "eu-west-1"
     dynamodb_table = "saw-terraform-locks"
