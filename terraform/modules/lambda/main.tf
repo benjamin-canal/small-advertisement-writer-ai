@@ -44,6 +44,8 @@ resource "aws_lambda_function" "fn" {
   filename         = data.archive_file.zip.output_path
   source_code_hash = data.archive_file.zip.output_base64sha256
 
+  layers = var.layers
+
   environment {
     variables = var.env_vars
   }

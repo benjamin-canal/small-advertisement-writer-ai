@@ -69,6 +69,18 @@ module "authorizer" {
   extra_policy_arns = [module.secrets_manager.read_policy_arn]
 }
 
+locals {
+  # Env vars shared by all AI Lambdas for the Parameters & Secrets extension
+  secrets_extension_env = {
+    ANTHROPIC_SECRET_ARN                         = module.secrets_manager.anthropic_secret_arn
+    PARAMETERS_SECRETS_EXTENSION_CACHE_ENABLED   = "true"
+    PARAMETERS_SECRETS_EXTENSION_CACHE_SIZE      = "10"
+    PARAMETERS_SECRETS_EXTENSION_MAX_CONNECTIONS = "3"
+    PARAMETERS_SECRETS_EXTENSION_HTTP_PORT       = "2773"
+    PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL       = var.env == "dev" ? "debug" : "warn"
+  }
+}
+
 module "analyze_fn" {
   source        = "./modules/lambda"
   function_name = "${local.project}-analyze-fn-${local.env}"
@@ -78,12 +90,12 @@ module "analyze_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/analyze-fn"
   tags          = local.tags
-  env_vars = {
-    LOG_LEVEL             = var.log_level
-    S3_BUCKET             = module.s3.bucket_name
-    DYNAMODB_TABLE        = module.dynamodb.requests_table_name
-    ANTHROPIC_SECRET_ARN  = module.secrets_manager.anthropic_secret_arn
-  }
+  layers        = [var.secrets_extension_layer_arn]
+  env_vars = merge(local.secrets_extension_env, {
+    LOG_LEVEL      = var.log_level
+    S3_BUCKET      = module.s3.bucket_name
+    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+  })
   extra_policy_arns = [
     module.s3.read_policy_arn,
     module.dynamodb.write_policy_arn,
@@ -100,11 +112,11 @@ module "estimate_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/estimate-fn"
   tags          = local.tags
-  env_vars = {
-    LOG_LEVEL            = var.log_level
-    DYNAMODB_TABLE       = module.dynamodb.requests_table_name
-    ANTHROPIC_SECRET_ARN = module.secrets_manager.anthropic_secret_arn
-  }
+  layers        = [var.secrets_extension_layer_arn]
+  env_vars = merge(local.secrets_extension_env, {
+    LOG_LEVEL      = var.log_level
+    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+  })
   extra_policy_arns = [
     module.dynamodb.write_policy_arn,
     module.secrets_manager.anthropic_read_policy_arn,
@@ -120,11 +132,11 @@ module "generate_fn" {
   log_retention = var.log_retention_days
   source_dir    = "${path.root}/../dist/generate-fn"
   tags          = local.tags
-  env_vars = {
-    LOG_LEVEL            = var.log_level
-    DYNAMODB_TABLE       = module.dynamodb.requests_table_name
-    ANTHROPIC_SECRET_ARN = module.secrets_manager.anthropic_secret_arn
-  }
+  layers        = [var.secrets_extension_layer_arn]
+  env_vars = merge(local.secrets_extension_env, {
+    LOG_LEVEL      = var.log_level
+    DYNAMODB_TABLE = module.dynamodb.requests_table_name
+  })
   extra_policy_arns = [
     module.dynamodb.write_policy_arn,
     module.secrets_manager.anthropic_read_policy_arn,
