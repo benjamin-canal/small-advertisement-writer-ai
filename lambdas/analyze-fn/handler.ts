@@ -27,8 +27,12 @@ export const handler = async (
       return err('Missing s3Key or requestId', 400);
     }
 
-    if (/\.\./.test(body.s3Key) || body.s3Key.startsWith('/')) {
+    if (!/^[\w\-./]+$/.test(body.s3Key) || /\.\./.test(body.s3Key)) {
       return err('Invalid s3Key', 400);
+    }
+
+    if (!/^[\w\-]{1,128}$/.test(body.requestId)) {
+      return err('Invalid requestId', 400);
     }
 
     const s3Res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: body.s3Key }));

@@ -30,5 +30,9 @@ export const handler = async (
   if (!key) return { isAuthorized: false, context: {} };
 
   const expected = await getApiKey();
-  return { isAuthorized: key === expected, context: {} };
+  // Constant-time comparison to prevent timing side-channel attacks
+  const isAuthorized =
+    key.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected));
+  return { isAuthorized, context: {} };
 };
