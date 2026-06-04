@@ -1,26 +1,18 @@
-name: Deploy Prod
+name: Deploy Dev
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
 
 jobs:
-  confirm:
-    name: Require manual confirmation
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - run: echo "Deployment to production confirmed"
-
   deploy:
-    name: Build & Deploy (prod)
+    name: Build & Deploy (dev)
     runs-on: ubuntu-latest
-    environment: prod
-    needs: confirm
+    environment: dev
 
     steps:
       - uses: actions/checkout@v4
@@ -52,32 +44,13 @@ jobs:
 
       - name: Terraform apply
         working-directory: terraform
-        run: terraform apply -var-file=environments/prod.tfvars -auto-approve -input=false
+        run: terraform apply -var-file=environments/dev.tfvars -auto-approve -input=false
 
       - name: Update Lambda code
         run: |
           for fn in analyze-fn estimate-fn generate-fn; do
             zip -j dist/${fn}/handler.zip dist/${fn}/handler.mjs
             aws lambda update-function-code \
-              --function-name saw-${fn}-prod \
+              --function-name saw-${fn}-dev \
               --zip-file fileb://dist/${fn}/handler.zip
           done
-
-      - name: Record deployment version
-        run: |
-          aws dynamodb put-item \
-            --table-name saw-versions-prod \
-            --item "{
-              \"version\":    {\"S\": \"$GITHUB_SHA\"},
-              \"deployedAt\": {\"S\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},
-              \"commitSha\":  {\"S\": \"$GITHUB_SHA\"},
-              \"env\":        {\"S\": \"prod\"}
-            }"
-
-      - name: Tag release
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          TAG="prod-$(date +%Y%m%d-%H%M%S)"
-          git tag $TAG
-          git push origin $TAG
