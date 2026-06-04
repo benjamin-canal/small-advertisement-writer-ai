@@ -23,9 +23,9 @@ resource "aws_iam_role_policy_attachment" "basic" {
 }
 
 resource "aws_iam_role_policy_attachment" "extra" {
-  for_each   = toset(var.extra_policy_arns)
+  count      = length(var.extra_policy_arns)
   role       = aws_iam_role.lambda.name
-  policy_arn = each.value
+  policy_arn = var.extra_policy_arns[count.index]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
