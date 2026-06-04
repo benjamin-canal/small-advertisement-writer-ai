@@ -3,6 +3,7 @@
 *.tfstate.backup
 tfplan
 dist/
+.build/
 node_modules/
 *.tfvars
 !terraform/environments/*.tfvars
