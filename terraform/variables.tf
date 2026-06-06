@@ -48,5 +48,5 @@ variable "lambda_reserved_concurrency" {
 variable "bedrock_model_id" {
   description = "Amazon Bedrock model ID (cross-region inference profile)"
   type        = string
-  default     = "eu.anthropic.claude-opus-4-5-20251101-v1:0"
+  default     = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
 }
