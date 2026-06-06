@@ -46,6 +46,15 @@ export const handler = async (
       return err('Image too large (max 5 MB)', 400);
     }
 
+    // The uploaded bytes may be PNG/WebP even when the S3 key ends in .jpg, so the
+    // real format is detected from the magic bytes. Rekognition and Bedrock both
+    // reject a declared format that does not match the bytes (→ 500), and Rekognition
+    // only supports JPEG/PNG.
+    const format = detectImageFormat(imageBytes);
+    if (!format) {
+      return err('Unsupported image format (JPEG or PNG only)', 400);
+    }
+
     // Detection (object / category / confidence) is handled by Amazon Rekognition,
     // a dedicated computer-vision model — faster, cheaper and more reliable than an LLM.
     const detected = await detectObject(imageBytes);
@@ -55,7 +64,7 @@ export const handler = async (
 
     // Condition is a qualitative judgement Rekognition cannot make, so Claude
     // assesses it, grounded by the detected object name.
-    const condition = await assessCondition(imageBytes, detected.object);
+    const condition = await assessCondition(imageBytes, format, detected.object);
 
     const data: AnalyzeResponse = {
       object: detected.object,
@@ -68,19 +77,40 @@ export const handler = async (
     return ok(data);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Internal error';
+    console.error('[analyze]', e);
     await audit(requestId, '/analyze', Date.now() - start, 500, msg);
     return err(msg);
   }
 };
 
-async function assessCondition(imageBytes: Uint8Array, object: string): Promise<string> {
+// Detects the image format from its magic bytes. Returns null for anything other
+// than JPEG or PNG (the formats supported by both Rekognition and Bedrock here).
+function detectImageFormat(bytes: Uint8Array): 'jpeg' | 'png' | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'jpeg';
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+  ) {
+    return 'png';
+  }
+  return null;
+}
+
+async function assessCondition(
+  imageBytes: Uint8Array,
+  format: 'jpeg' | 'png',
+  object: string
+): Promise<string> {
   const response = await getClient().send(new ConverseCommand({
     modelId: MODEL_ID,
     system: cachedSystem(SYSTEM_PROMPT),
     messages: [{
       role: 'user',
       content: [
-        { image: { format: 'jpeg', source: { bytes: imageBytes } } },
+        { image: { format, source: { bytes: imageBytes } } },
         { text: buildUserPrompt(object) },
       ],
     }],
