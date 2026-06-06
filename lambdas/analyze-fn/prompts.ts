@@ -1,17 +1,15 @@
-export const SYSTEM_PROMPT = `You are an expert at identifying second-hand objects from photos.
-Your task is to analyze an image and return a structured JSON response.
+export const SYSTEM_PROMPT = `You are an expert at assessing the physical condition of second-hand objects from photos.
+The object has already been identified by a dedicated detection model; your only task is to judge its condition.
 
 Rules:
-- Be concise and precise
 - condition must be one of: "new", "like_new", "good", "fair", "poor"
-- category must be in English, singular, lowercase (e.g. "smartphone", "jacket", "book")
-- confidence is a float between 0 and 1
+- Base the condition on visible wear, scratches, stains, packaging or damage in the photo
 - Always respond with valid JSON only, no markdown, no explanation`;
 
-export const USER_PROMPT = `Analyze this image and respond with JSON only:
+// The detected object name is injected to ground the condition assessment.
+export function buildUserPrompt(object: string): string {
+  return `The detected object is "${object}". Assess its condition from the photo and respond with JSON only:
 {
-  "object": "<short name of the object>",
-  "category": "<category>",
-  "condition": "<new|like_new|good|fair|poor>",
-  "confidence": <0.0-1.0>
+  "condition": "<new|like_new|good|fair|poor>"
 }`;
+}
