@@ -180,13 +180,16 @@ module "generate_fn" {
 }
 
 module "api_gateway" {
-  source              = "./modules/api-gateway"
-  env                 = local.env
-  project             = local.project
-  tags                = local.tags
-  authorizer_arn      = module.authorizer.function_arn
-  authorizer_role_arn = module.authorizer.invoke_role_arn
-  analyze_fn_arn      = module.analyze_fn.function_arn
-  estimate_fn_arn     = module.estimate_fn.function_arn
-  generate_fn_arn     = module.generate_fn.function_arn
+  source               = "./modules/api-gateway"
+  env                  = local.env
+  project              = local.project
+  tags                 = local.tags
+  authorizer_arn       = module.authorizer.function_arn
+  authorizer_role_arn  = module.authorizer.invoke_role_arn
+  analyze_fn_arn       = module.analyze_fn.function_arn
+  estimate_fn_arn      = module.estimate_fn.function_arn
+  generate_fn_arn      = module.generate_fn.function_arn
+  analyze_fn_role_arn  = module.analyze_fn.invoke_role_arn
+  estimate_fn_role_arn = module.estimate_fn.invoke_role_arn
+  generate_fn_role_arn = module.generate_fn.invoke_role_arn
 }

@@ -6,3 +6,6 @@ variable "authorizer_role_arn" { type = string }
 variable "analyze_fn_arn" { type = string }
 variable "estimate_fn_arn" { type = string }
 variable "generate_fn_arn" { type = string }
+variable "analyze_fn_role_arn" { type = string }
+variable "estimate_fn_role_arn" { type = string }
+variable "generate_fn_role_arn" { type = string }
