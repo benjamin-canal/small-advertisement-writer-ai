@@ -17,7 +17,6 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
   api_id                            = aws_apigatewayv2_api.api.id
   authorizer_type                   = "REQUEST"
   authorizer_uri                    = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/${var.authorizer_arn}/invocations"
-  authorizer_credentials_arn        = var.authorizer_role_arn
   identity_sources                  = ["$request.header.X-API-Key"]
   name                              = "api-key-authorizer"
   authorizer_payload_format_version = "2.0"
@@ -25,11 +24,22 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
   authorizer_result_ttl_in_seconds  = 300
 }
 
+# Resource-based permission so API Gateway can invoke the authorizer Lambda.
+# Without it, every authenticated request fails at the authorizer with a 500
+# (returned by API Gateway) before any function — and the authorizer never logs.
+resource "aws_lambda_permission" "authorizer" {
+  statement_id  = "AllowApiGatewayInvokeAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.authorizer_arn
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/authorizers/${aws_apigatewayv2_authorizer.api_key.id}"
+}
+
 locals {
   integrations = {
-    analyze  = { arn = var.analyze_fn_arn, role = var.analyze_fn_role_arn, route = "POST /analyze" }
-    estimate = { arn = var.estimate_fn_arn, role = var.estimate_fn_role_arn, route = "POST /estimate" }
-    generate = { arn = var.generate_fn_arn, role = var.generate_fn_role_arn, route = "POST /generate" }
+    analyze  = { arn = var.analyze_fn_arn, route = "POST /analyze" }
+    estimate = { arn = var.estimate_fn_arn, route = "POST /estimate" }
+    generate = { arn = var.generate_fn_arn, route = "POST /generate" }
   }
 }
 
@@ -39,10 +49,16 @@ resource "aws_apigatewayv2_integration" "fn" {
   integration_type       = "AWS_PROXY"
   integration_uri        = each.value.arn
   payload_format_version = "2.0"
-  # Without credentials, API Gateway cannot invoke the target Lambda and returns
-  # a 500 before the function ever runs (no CloudWatch logs). Each function's
-  # invoke role grants apigateway.amazonaws.com the lambda:InvokeFunction right.
-  credentials_arn = each.value.role
+}
+
+# Resource-based permission so API Gateway can invoke each route's Lambda.
+resource "aws_lambda_permission" "fn" {
+  for_each      = local.integrations
+  statement_id  = "AllowApiGatewayInvoke-${each.key}"
+  action        = "lambda:InvokeFunction"
+  function_name = each.value.arn
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
 resource "aws_apigatewayv2_route" "fn" {
