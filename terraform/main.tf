@@ -79,6 +79,20 @@ module "authorizer" {
   extra_policy_arns = [module.secrets_manager.read_policy_arn]
 }
 
+# IAM policy granting Rekognition object-detection access (analyze function only)
+resource "aws_iam_policy" "rekognition" {
+  name = "${local.project}-rekognition-${local.env}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["rekognition:DetectLabels"]
+      Resource = "*"
+    }]
+  })
+  tags = local.tags
+}
+
 # IAM policy granting Bedrock InvokeModel access to Claude models
 resource "aws_iam_policy" "bedrock" {
   name = "${local.project}-bedrock-${local.env}"
@@ -119,6 +133,7 @@ module "analyze_fn" {
     module.s3.read_policy_arn,
     module.dynamodb.write_policy_arn,
     aws_iam_policy.bedrock.arn,
+    aws_iam_policy.rekognition.arn,
   ]
 }
 

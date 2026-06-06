@@ -4,9 +4,10 @@ import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
+import { detectObject } from '../shared/rekognition.js';
 import { ok, err } from '../shared/response.js';
 import type { AnalyzeRequest, AnalyzeResponse } from '../shared/types.js';
-import { SYSTEM_PROMPT, USER_PROMPT } from './prompts.js';
+import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
 
 const s3 = new S3Client({});
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -45,26 +46,23 @@ export const handler = async (
       return err('Image too large (max 5 MB)', 400);
     }
 
-    const response = await getClient().send(new ConverseCommand({
-      modelId: MODEL_ID,
-      system: cachedSystem(SYSTEM_PROMPT),
-      messages: [{
-        role: 'user',
-        content: [
-          { image: { format: 'jpeg', source: { bytes: imageBytes } } },
-          { text: USER_PROMPT },
-        ],
-      }],
-      inferenceConfig: inferenceConfig(256),
-    }));
-
-    const text = extractText(response.output?.message?.content);
-    let data: AnalyzeResponse;
-    try {
-      data = JSON.parse(text) as AnalyzeResponse;
-    } catch {
-      throw new Error('Invalid response from AI model');
+    // Detection (object / category / confidence) is handled by Amazon Rekognition,
+    // a dedicated computer-vision model — faster, cheaper and more reliable than an LLM.
+    const detected = await detectObject(imageBytes);
+    if (!detected) {
+      return err('No object detected in image', 422);
     }
+
+    // Condition is a qualitative judgement Rekognition cannot make, so Claude
+    // assesses it, grounded by the detected object name.
+    const condition = await assessCondition(imageBytes, detected.object);
+
+    const data: AnalyzeResponse = {
+      object: detected.object,
+      category: detected.category,
+      condition,
+      confidence: detected.confidence,
+    };
 
     await audit(requestId, '/analyze', Date.now() - start, 200);
     return ok(data);
@@ -74,6 +72,32 @@ export const handler = async (
     return err(msg);
   }
 };
+
+async function assessCondition(imageBytes: Uint8Array, object: string): Promise<string> {
+  const response = await getClient().send(new ConverseCommand({
+    modelId: MODEL_ID,
+    system: cachedSystem(SYSTEM_PROMPT),
+    messages: [{
+      role: 'user',
+      content: [
+        { image: { format: 'jpeg', source: { bytes: imageBytes } } },
+        { text: buildUserPrompt(object) },
+      ],
+    }],
+    inferenceConfig: inferenceConfig(64),
+  }));
+
+  const text = extractText(response.output?.message?.content);
+  try {
+    const parsed = JSON.parse(text) as { condition?: string };
+    if (!parsed.condition) {
+      throw new Error('missing condition');
+    }
+    return parsed.condition;
+  } catch {
+    throw new Error('Invalid response from AI model');
+  }
+}
 
 async function audit(
   requestId: string,
