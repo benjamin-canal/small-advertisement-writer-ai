@@ -27,9 +27,9 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
 
 locals {
   integrations = {
-    analyze  = { arn = var.analyze_fn_arn, route = "POST /analyze" }
-    estimate = { arn = var.estimate_fn_arn, route = "POST /estimate" }
-    generate = { arn = var.generate_fn_arn, route = "POST /generate" }
+    analyze  = { arn = var.analyze_fn_arn, role = var.analyze_fn_role_arn, route = "POST /analyze" }
+    estimate = { arn = var.estimate_fn_arn, role = var.estimate_fn_role_arn, route = "POST /estimate" }
+    generate = { arn = var.generate_fn_arn, role = var.generate_fn_role_arn, route = "POST /generate" }
   }
 }
 
@@ -39,6 +39,10 @@ resource "aws_apigatewayv2_integration" "fn" {
   integration_type       = "AWS_PROXY"
   integration_uri        = each.value.arn
   payload_format_version = "2.0"
+  # Without credentials, API Gateway cannot invoke the target Lambda and returns
+  # a 500 before the function ever runs (no CloudWatch logs). Each function's
+  # invoke role grants apigateway.amazonaws.com the lambda:InvokeFunction right.
+  credentials_arn = each.value.role
 }
 
 resource "aws_apigatewayv2_route" "fn" {
