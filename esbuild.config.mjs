@@ -15,6 +15,13 @@ await Promise.all(
       format: 'esm',
       outfile: `dist/${name}/handler.mjs`,
       external: [],
+      // The bundled AWS SDK does dynamic require() of Node built-ins (e.g.
+      // node:https). In an ESM bundle require() doesn't exist, so the Lambda
+      // crashes at init with "Dynamic require of X is not supported". Recreate
+      // require() from import.meta.url so those calls resolve at runtime.
+      banner: {
+        js: "import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);",
+      },
       treeShaking: true,
       minify: true,
     })
