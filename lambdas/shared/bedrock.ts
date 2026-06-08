@@ -28,6 +28,33 @@ export function extractText(content: ContentBlock[] | undefined): string {
   return block && 'text' in block ? block.text ?? '' : '';
 }
 
+// Parses JSON out of a model text response, tolerating markdown code fences
+// (```json ... ```) and surrounding prose. Throws a stable error otherwise.
+export function parseModelJson<T>(text: string): T {
+  const trimmed = text.trim();
+  const candidates: string[] = [trimmed];
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    candidates.push(fenced[1].trim());
+  }
+
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    candidates.push(trimmed.slice(start, end + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      // try the next candidate
+    }
+  }
+  throw new Error('Invalid response from AI model');
+}
+
 export function inferenceConfig(maxTokens: number): InferenceConfiguration {
   return { maxTokens };
 }

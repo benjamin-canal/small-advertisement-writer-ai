@@ -2,7 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
+import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig, parseModelJson } from '../shared/bedrock.js';
 import { ok, err } from '../shared/response.js';
 import type { GenerateRequest, GeneratedListing } from '../shared/types.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
@@ -33,13 +33,7 @@ export const handler = async (
       inferenceConfig: inferenceConfig(512),
     }));
 
-    const text = extractText(response.output?.message?.content);
-    let data: GeneratedListing;
-    try {
-      data = JSON.parse(text) as GeneratedListing;
-    } catch {
-      throw new Error('Invalid response from AI model');
-    }
+    const data = parseModelJson<GeneratedListing>(extractText(response.output?.message?.content));
 
     await audit(requestId, '/generate', Date.now() - start, 200);
     return ok(data);

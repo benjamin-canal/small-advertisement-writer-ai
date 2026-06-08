@@ -3,7 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
+import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig, parseModelJson } from '../shared/bedrock.js';
 import { detectObject } from '../shared/rekognition.js';
 import { ok, err } from '../shared/response.js';
 import type { AnalyzeRequest, AnalyzeResponse } from '../shared/types.js';
@@ -117,16 +117,11 @@ async function assessCondition(
     inferenceConfig: inferenceConfig(64),
   }));
 
-  const text = extractText(response.output?.message?.content);
-  try {
-    const parsed = JSON.parse(text) as { condition?: string };
-    if (!parsed.condition) {
-      throw new Error('missing condition');
-    }
-    return parsed.condition;
-  } catch {
+  const parsed = parseModelJson<{ condition?: string }>(extractText(response.output?.message?.content));
+  if (!parsed.condition) {
     throw new Error('Invalid response from AI model');
   }
+  return parsed.condition;
 }
 
 async function audit(
