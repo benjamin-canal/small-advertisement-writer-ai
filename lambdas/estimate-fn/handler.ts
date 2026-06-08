@@ -2,7 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig } from '../shared/bedrock.js';
+import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig, parseModelJson } from '../shared/bedrock.js';
 import { ok, err } from '../shared/response.js';
 import type { EstimateRequest, EstimatePriceResponse } from '../shared/types.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
@@ -30,13 +30,7 @@ export const handler = async (
       inferenceConfig: inferenceConfig(128),
     }));
 
-    const text = extractText(response.output?.message?.content);
-    let data: EstimatePriceResponse;
-    try {
-      data = JSON.parse(text) as EstimatePriceResponse;
-    } catch {
-      throw new Error('Invalid response from AI model');
-    }
+    const data = parseModelJson<EstimatePriceResponse>(extractText(response.output?.message?.content));
 
     await audit(requestId, '/estimate', Date.now() - start, 200);
     return ok(data);
