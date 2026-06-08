@@ -4,7 +4,7 @@ import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig, parseModelJson } from '../shared/bedrock.js';
-import { detectObject } from '../shared/rekognition.js';
+import { gatherHints, type VisionHints } from '../shared/rekognition.js';
 import { ok, err } from '../shared/response.js';
 import type { AnalyzeRequest, AnalyzeResponse } from '../shared/types.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
@@ -55,23 +55,10 @@ export const handler = async (
       return err('Unsupported image format (JPEG or PNG only)', 400);
     }
 
-    // Detection (object / category / confidence) is handled by Amazon Rekognition,
-    // a dedicated computer-vision model — faster, cheaper and more reliable than an LLM.
-    const detected = await detectObject(imageBytes);
-    if (!detected) {
-      return err('No object detected in image', 422);
-    }
-
-    // Condition is a qualitative judgement Rekognition cannot make, so Claude
-    // assesses it, grounded by the detected object name.
-    const condition = await assessCondition(imageBytes, format, detected.object);
-
-    const data: AnalyzeResponse = {
-      object: detected.object,
-      category: detected.category,
-      condition,
-      confidence: detected.confidence,
-    };
+    // Rekognition supplies grounding hints (generic labels + on-item text/logos);
+    // Claude does the actual identification, which it does far better for brand/model.
+    const hints = await gatherHints(imageBytes);
+    const data = await identify(imageBytes, format, hints);
 
     await audit(requestId, '/analyze', Date.now() - start, 200);
     return ok(data);
@@ -99,11 +86,13 @@ function detectImageFormat(bytes: Uint8Array): 'jpeg' | 'png' | null {
   return null;
 }
 
-async function assessCondition(
+const CONDITIONS = ['new', 'like_new', 'good', 'fair', 'poor'];
+
+async function identify(
   imageBytes: Uint8Array,
   format: 'jpeg' | 'png',
-  object: string
-): Promise<string> {
+  hints: VisionHints
+): Promise<AnalyzeResponse> {
   const response = await getClient().send(new ConverseCommand({
     modelId: MODEL_ID,
     system: cachedSystem(SYSTEM_PROMPT),
@@ -111,17 +100,23 @@ async function assessCondition(
       role: 'user',
       content: [
         { image: { format, source: { bytes: imageBytes } } },
-        { text: buildUserPrompt(object) },
+        { text: buildUserPrompt(hints) },
       ],
     }],
-    inferenceConfig: inferenceConfig(64),
+    inferenceConfig: inferenceConfig(256),
   }));
 
-  const parsed = parseModelJson<{ condition?: string }>(extractText(response.output?.message?.content));
-  if (!parsed.condition) {
+  const parsed = parseModelJson<Partial<AnalyzeResponse>>(extractText(response.output?.message?.content));
+  if (!parsed.object || !parsed.category || !parsed.condition) {
     throw new Error('Invalid response from AI model');
   }
-  return parsed.condition;
+
+  return {
+    object: parsed.object,
+    category: parsed.category,
+    condition: CONDITIONS.includes(parsed.condition) ? parsed.condition : 'good',
+    confidence: typeof parsed.confidence === 'number' ? Math.min(Math.max(parsed.confidence, 0), 1) : 0.7,
+  };
 }
 
 async function audit(
