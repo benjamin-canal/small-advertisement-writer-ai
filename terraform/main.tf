@@ -86,7 +86,7 @@ resource "aws_iam_policy" "rekognition" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["rekognition:DetectLabels"]
+      Action   = ["rekognition:DetectLabels", "rekognition:DetectText"]
       Resource = "*"
     }]
   })
