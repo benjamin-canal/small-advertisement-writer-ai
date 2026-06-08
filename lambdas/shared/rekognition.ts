@@ -1,49 +1,45 @@
 import {
   RekognitionClient,
   DetectLabelsCommand,
+  DetectTextCommand,
   type Label,
 } from '@aws-sdk/client-rekognition';
 
 const client = new RekognitionClient({ region: process.env.AWS_REGION ?? 'eu-west-1' });
 
-export interface DetectedObject {
-  object: string;
-  category: string;
-  confidence: number;
+export interface VisionHints {
+  /** Generic object/scene labels, most confident first (e.g. "Sneaker", "Footwear"). */
+  labels: string[];
+  /** Text and logos read off the item — brands and models (e.g. "NIKE", "501"). */
+  texts: string[];
 }
 
 type NamedLabel = Label & { Name: string; Confidence: number };
 
-// Runs object detection on raw image bytes and returns the most likely object,
-// its broader category and the detection confidence (0-1). Returns null when no
-// label clears the confidence threshold.
-export async function detectObject(imageBytes: Uint8Array): Promise<DetectedObject | null> {
-  const res = await client.send(new DetectLabelsCommand({
-    Image: { Bytes: imageBytes },
-    MaxLabels: 10,
-    MinConfidence: 55,
-  }));
+// Gathers grounding hints for the LLM: generic labels (DetectLabels) and any
+// on-item text/logos (DetectText). These anchor Claude's identification and
+// curb hallucinated brands, without being authoritative themselves.
+export async function gatherHints(imageBytes: Uint8Array): Promise<VisionHints> {
+  const [labelsRes, textRes] = await Promise.all([
+    client.send(new DetectLabelsCommand({ Image: { Bytes: imageBytes }, MaxLabels: 12, MinConfidence: 55 })),
+    client.send(new DetectTextCommand({ Image: { Bytes: imageBytes } })),
+  ]);
 
-  const labels = (res.Labels ?? [])
+  const labels = (labelsRes.Labels ?? [])
     .filter((l): l is NamedLabel => typeof l.Name === 'string' && typeof l.Confidence === 'number')
-    .sort((a, b) => b.Confidence - a.Confidence);
+    .sort((a, b) => b.Confidence - a.Confidence)
+    .map((l) => l.Name)
+    .slice(0, 12);
 
-  if (labels.length === 0) {
-    return null;
-  }
-  const top = labels[0];
+  // LINE detections carry more meaning than individual words; keep confident,
+  // deduplicated entries only.
+  const texts = Array.from(
+    new Set(
+      (textRes.TextDetections ?? [])
+        .filter((t) => t.Type === 'LINE' && typeof t.DetectedText === 'string' && (t.Confidence ?? 0) >= 80)
+        .map((t) => t.DetectedText as string)
+    )
+  ).slice(0, 10);
 
-  // Category: prefer Rekognition's taxonomy category, then the broadest parent,
-  // then fall back to the label itself.
-  const parents = top.Parents ?? [];
-  const category =
-    top.Categories?.[0]?.Name ??
-    parents[parents.length - 1]?.Name ??
-    top.Name;
-
-  return {
-    object: top.Name.toLowerCase(),
-    category: category.toLowerCase(),
-    confidence: Math.round((top.Confidence / 100) * 100) / 100,
-  };
+  return { labels, texts };
 }
