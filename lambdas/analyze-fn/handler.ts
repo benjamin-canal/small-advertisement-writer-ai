@@ -5,6 +5,7 @@ import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { getClient, MODEL_ID, cachedSystem, extractText, inferenceConfig, parseModelJson } from '../shared/bedrock.js';
 import { gatherHints, type VisionHints } from '../shared/rekognition.js';
+import { canonicalBrand } from '../shared/reference/brands.js';
 import { ok, err } from '../shared/response.js';
 import type { AnalyzeRequest, AnalyzeResponse } from '../shared/types.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.js';
@@ -106,17 +107,34 @@ async function identify(
     inferenceConfig: inferenceConfig(256),
   }));
 
-  const parsed = parseModelJson<Partial<AnalyzeResponse>>(extractText(response.output?.message?.content));
+  const parsed = parseModelJson<RawIdentification>(extractText(response.output?.message?.content));
   if (!parsed.object || !parsed.category || !parsed.condition) {
     throw new Error('Invalid response from AI model');
   }
 
+  // Normalise the brand against the reference so listings stay consistent
+  // ("nike"/"NIKE" → "Nike"). Recompose the object name from the canonical
+  // brand; keep Claude's name when the brand is unknown to us.
+  const brand = canonicalBrand(parsed.brand);
+  const object = brand
+    ? [brand, parsed.model].filter((part): part is string => Boolean(part && part.trim())).join(' ').trim()
+    : parsed.object;
+
   return {
-    object: parsed.object,
+    object: object || parsed.object,
     category: parsed.category,
     condition: CONDITIONS.includes(parsed.condition) ? parsed.condition : 'good',
     confidence: typeof parsed.confidence === 'number' ? Math.min(Math.max(parsed.confidence, 0), 1) : 0.7,
   };
+}
+
+interface RawIdentification {
+  brand?: string | null;
+  model?: string;
+  object?: string;
+  category?: string;
+  condition?: string;
+  confidence?: number;
 }
 
 async function audit(
