@@ -1,6 +1,5 @@
 import {
   BedrockRuntimeClient,
-  ConverseCommand,
   type SystemContentBlock,
   type ContentBlock,
   type InferenceConfiguration,
