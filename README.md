@@ -6,7 +6,7 @@ Expose trois endpoints Claude via API Gateway HTTP v2 :
 
 | Endpoint | Description |
 |---|---|
-| `POST /analyze` | Identifie l'objet depuis une image S3 (Claude vision) |
+| `POST /analyze` | Identifie l'objet depuis une ou plusieurs images S3 (objet + étiquette) — attributs structurés (marque, modèle, type, taille, couleur, matière, genre, état) avec confiance et alternatives par champ (Claude vision + Rekognition OCR) |
 | `POST /estimate` | Estime la fourchette de prix (marché FR) |
 | `POST /generate` | Génère titre, description, keywords pour Vinted/Leboncoin |
 
