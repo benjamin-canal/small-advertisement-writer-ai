@@ -27,7 +27,7 @@ export const handler = async (
     const body = JSON.parse(event.body ?? '{}') as AnalyzeRequest;
     requestId = body.requestId;
 
-    if (!body.requestId || !/^[\w\-]{1,128}$/.test(body.requestId)) {
+    if (!body.requestId || !/^[\w-]{1,128}$/.test(body.requestId)) {
       return err('Missing or invalid requestId', 400);
     }
 
@@ -40,7 +40,7 @@ export const handler = async (
       return err(`Too many images (max ${MAX_IMAGES})`, 400);
     }
     for (const ref of refs) {
-      if (!/^[\w\-./]+$/.test(ref.s3Key) || /\.\./.test(ref.s3Key)) {
+      if (!/^[\w./-]+$/.test(ref.s3Key) || /\.\./.test(ref.s3Key)) {
         return err('Invalid s3Key', 400);
       }
     }
