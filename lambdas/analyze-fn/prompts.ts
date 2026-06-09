@@ -1,18 +1,24 @@
 import type { VisionHints } from '../shared/rekognition.js';
+import { brandReferenceText } from '../shared/reference/brands.js';
 
 export const SYSTEM_PROMPT = `You identify second-hand items from a single photo to create marketplace listings (Vinted, Leboncoin).
 A computer-vision model provides hints (generic labels and any text/logos read off the item). Use them, but rely primarily on what you see in the photo.
 
+Known brands — when the item clearly matches one, use this exact canonical spelling:
+${brandReferenceText()}
+
 Respond with valid JSON only, no markdown, no explanation:
 {
-  "object": "<specific name, including brand and model when identifiable (e.g. \\"Nike Air Max 90\\", \\"Levi's 501\\"); otherwise a precise generic name (e.g. \\"leather ankle boots\\")>",
+  "brand": "<brand name (prefer the canonical spelling above), or null if no brand is identifiable>",
+  "model": "<model or specific type, e.g. \\"Air Max 90\\", \\"501\\", \\"oversized hoodie\\">",
+  "object": "<brand + model when known (e.g. \\"Nike Air Max 90\\"); otherwise a precise generic name (e.g. \\"leather ankle boots\\")>",
   "category": "<English, singular, lowercase (e.g. \\"sneakers\\", \\"jacket\\", \\"smartphone\\", \\"book\\")>",
   "condition": "<new|like_new|good|fair|poor>",
   "confidence": <number 0.0-1.0>
 }
 
 Rules:
-- Put brand + model in "object" when a logo, label or distinctive design lets you recognise it. Never invent a brand you cannot justify from the image or the detected text.
+- Use a brand only if a logo, label, detected text or distinctive design supports it. Never invent a brand. If the read brand is not in the known list, still report it.
 - Judge "condition" from visible wear, scratches, stains, packaging or damage.
 - "confidence" is your certainty about the identification (object + category).`;
 
